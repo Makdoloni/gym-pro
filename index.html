@@ -3,12 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>GymProgress AI v23.1</title>
+    <title>GymProgress AI v24</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
-        :root { --bg: #000; --card: #121214; --accent: #32d74b; --blue: #0a84ff; --gray: #8e8e93; }
+        :root { --bg: #000; --card: #121214; --accent: #32d74b; --gray: #8e8e93; }
         body { font-family: -apple-system, sans-serif; background: var(--bg); color: #fff; margin: 0; padding: 12px; overflow-x: hidden; }
         
         .header { padding: 30px 15px; background: linear-gradient(180deg, #1c1c1e 0%, #000 100%); border-radius: 28px; border: 1px solid #222; text-align: center; margin-bottom: 12px; }
@@ -16,24 +16,23 @@
         
         .asset-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px; }
         .asset-box { background: var(--card); padding: 15px; border-radius: 20px; border: 1px solid #222; }
-        .label { font-size: 9px; color: var(--gray); text-transform: uppercase; letter-spacing: 1px; display: block; margin-bottom: 4px; }
+        .label { font-size: 9px; color: var(--gray); text-transform: uppercase; display: block; margin-bottom: 4px; }
         .val { font-size: 20px; font-weight: 800; }
 
         input, select { background: #1c1c1e; border: 1px solid #333; color: #fff; padding: 16px; border-radius: 14px; font-size: 16px; width: 100%; box-sizing: border-box; outline: none; margin-bottom: 10px; }
-        .btn-trade { background: var(--accent); color: #000; border: none; padding: 20px; border-radius: 18px; font-weight: 900; width: 100%; font-size: 17px; text-transform: uppercase; cursor: pointer; transition: 0.2s; }
-        .btn-trade:active { transform: scale(0.96); }
+        .btn-trade { background: var(--accent); color: #000; border: none; padding: 20px; border-radius: 18px; font-weight: 900; width: 100%; font-size: 17px; text-transform: uppercase; cursor: pointer; }
         
         .chart-container { height: 180px; margin: 15px 0; position: relative; }
-        .future-blur { position: absolute; right: 0; top: 0; width: 45%; height: 100%; background: linear-gradient(90deg, transparent, rgba(0,0,0,0.96) 80%); backdrop-filter: blur(6px); display: flex; align-items: center; justify-content: center; color: var(--accent); font-size: 11px; font-weight: bold; text-align: center; border-radius: 0 20px 20px 0; }
+        .future-blur { position: absolute; right: 0; top: 0; width: 45%; height: 100%; background: linear-gradient(90deg, transparent, rgba(0,0,0,0.96) 80%); backdrop-filter: blur(6px); display: flex; align-items: center; justify-content: center; color: var(--accent); font-size: 11px; font-weight: bold; text-align: center; border-radius: 0 22px 22px 0; }
     </style>
 </head>
 <body>
 
 <div class="header">
-    <div style="background: rgba(50,215,75,0.15); color: var(--accent); display: inline-block; padding: 4px 12px; border-radius: 8px; font-size: 11px; font-weight: bold; margin-bottom: 10px;">MARKET: OPEN</div>
+    <div style="background: rgba(50,215,75,0.15); color: var(--accent); display: inline-block; padding: 4px 12px; border-radius: 8px; font-size: 11px; font-weight: bold; margin-bottom: 10px;">SYSTEM: ACTIVE</div>
     <span class="label">Body Net Worth</span>
     <div class="net-worth" id="net-worth-val">1000.00</div>
-    <div style="color: var(--accent); font-weight: bold; font-size: 13px;" id="prediction-msg">Синхронизация с облаком...</div>
+    <div style="color: var(--accent); font-weight: bold; font-size: 13px;" id="prediction-msg">Синхронизация...</div>
     
     <div class="chart-container">
         <canvas id="predictionChart"></canvas>
@@ -61,46 +60,40 @@
 </div>
 
 <script>
-    // 1. Немедленная инициализация клиента (глобально)
     const tg = window.Telegram.WebApp;
     tg.expand();
 
-    // --- НАСТРОЙКИ SUPABASE ---
-    const S_URL = 'https://zgsvtvbwgbxyztyxynez.supabase.co'; 
-    const S_KEY = 'sb_publishable_HPZQa10In3R3s6siI4ttAQ_QpWWZmgS'; 
+    // Данные Supabase
+    const S_URL = 'https://zgsvtvbwgbxyztyxynez.supabase.co'.trim(); 
+    const S_KEY = 'ВСТАВЬ_СВОЙ_ANON_KEY'.trim(); 
     
-    // Создаем клиент сразу
     const supabaseClient = supabase.createClient(S_URL, S_KEY);
-
-    const userId = tg.initDataUnsafe?.user?.id || "local_dev_user";
+    // Принудительно превращаем ID в строку, чтобы база не ругалась на UUID
+    const userId = String(tg.initDataUnsafe?.user?.id || "demo_user_777"); 
     let chart;
 
-    // 2. Функция загрузки данных
     async function loadDashboard() {
         try {
-            // Вызываем твою SQL функцию
-            const { data: pred, error: rpcError } = await supabaseClient.rpc('get_prediction_data', { user_id: userId });
+            // Вызываем функцию прогноза (t_user_id теперь принимает текст)
+            const { data: pred } = await supabaseClient.rpc('get_prediction_data', { t_user_id: userId });
             
-            // Считаем количество записей для Индекса Дисциплины
-            const { count: sessions, error: countError } = await supabaseClient
+            // Считаем тренировки для Дисциплины
+            const { count: sessions } = await supabaseClient
                 .from('workouts')
                 .select('*', { count: 'exact', head: true })
                 .eq('user_id', userId);
 
-            if (rpcError || countError) console.error("Ошибка API:", rpcError || countError);
-
             const current = (pred && pred.current) ? pred.current : 0;
-            const f30 = (pred && pred.forecast_30d) ? pred.forecast_30d : current + 10;
-            const f60 = (pred && pred.forecast_60d) ? pred.forecast_60d : f30 + 10;
+            const f30 = current + 10;
+            const f60 = current + 20;
             const discipline = (sessions || 0) * 12.5;
 
-            // Обновляем текст
             document.getElementById('net-worth-val').innerText = (1000 + current + discipline).toFixed(2);
             document.getElementById('str-val').innerText = current.toFixed(1);
             document.getElementById('dis-val').innerText = discipline.toFixed(1);
             document.getElementById('prediction-msg').innerText = `Прогноз (60д): ${Math.round(f60)} кг`;
 
-            // Убираем блюр если сессий 3 или больше
+            // Убираем блюр, если есть прогресс
             if ((sessions || 0) >= 3) {
                 document.getElementById('blur-overlay').style.display = 'none';
             }
@@ -111,15 +104,12 @@
         }
     }
 
-    // 3. Функция обработки кнопки
     async function handleTrade() {
-        const weightInput = document.getElementById('w');
-        const repsInput = document.getElementById('r');
-        const w = parseFloat(weightInput.value);
-        const r = parseInt(repsInput.value);
+        const w = parseFloat(document.getElementById('w').value);
+        const r = parseInt(document.getElementById('r').value);
         
         if(!w || !r) {
-            tg.showAlert("Введите параметры сделки!");
+            tg.showAlert("Заполни данные сделки!");
             return;
         }
 
@@ -136,21 +126,18 @@
             tg.HapticFeedback.notificationOccurred('success');
             tg.showAlert("СДЕЛКА ЗАКРЫТА: ИНВЕСТИЦИЯ ПРИНЯТА");
             
-            weightInput.value = ''; 
-            repsInput.value = '';
+            document.getElementById('w').value = '';
+            document.getElementById('r').value = '';
             
-            // Перегружаем данные
             loadDashboard();
         } catch (err) {
-            tg.showAlert("Ошибка базы: " + err.message);
+            tg.showAlert("Ошибка: " + err.message);
         }
     }
 
-    // 4. Отрисовка графика
     function updateChart(curr, f30, f60) {
         const ctx = document.getElementById('predictionChart').getContext('2d');
         if (chart) chart.destroy();
-        
         chart = new Chart(ctx, {
             type: 'line',
             data: {
@@ -167,8 +154,7 @@
                 }]
             },
             options: {
-                responsive: true,
-                maintainAspectRatio: false,
+                responsive: true, maintainAspectRatio: false,
                 scales: { 
                     y: { display: false }, 
                     x: { grid: { display: false }, ticks: { color: '#8e8e93' } } 
@@ -178,9 +164,7 @@
         });
     }
 
-    // Запуск при старте
     window.onload = loadDashboard;
 </script>
-
 </body>
 </html>

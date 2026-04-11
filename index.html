@@ -3,12 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>GymProgress AI v24</title>
+    <title>GymProgress AI v24.1</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
-        :root { --bg: #000; --card: #121214; --accent: #32d74b; --gray: #8e8e93; }
+        :root { --bg: #000; --card: #121214; --accent: #32d74b; --blue: #0a84ff; --gray: #8e8e93; }
         body { font-family: -apple-system, sans-serif; background: var(--bg); color: #fff; margin: 0; padding: 12px; overflow-x: hidden; }
         
         .header { padding: 30px 15px; background: linear-gradient(180deg, #1c1c1e 0%, #000 100%); border-radius: 28px; border: 1px solid #222; text-align: center; margin-bottom: 12px; }
@@ -16,11 +16,12 @@
         
         .asset-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px; }
         .asset-box { background: var(--card); padding: 15px; border-radius: 20px; border: 1px solid #222; }
-        .label { font-size: 9px; color: var(--gray); text-transform: uppercase; display: block; margin-bottom: 4px; }
+        .label { font-size: 9px; color: var(--gray); text-transform: uppercase; letter-spacing: 1px; display: block; margin-bottom: 4px; }
         .val { font-size: 20px; font-weight: 800; }
 
         input, select { background: #1c1c1e; border: 1px solid #333; color: #fff; padding: 16px; border-radius: 14px; font-size: 16px; width: 100%; box-sizing: border-box; outline: none; margin-bottom: 10px; }
-        .btn-trade { background: var(--accent); color: #000; border: none; padding: 20px; border-radius: 18px; font-weight: 900; width: 100%; font-size: 17px; text-transform: uppercase; cursor: pointer; }
+        .btn-trade { background: var(--accent); color: #000; border: none; padding: 20px; border-radius: 18px; font-weight: 900; width: 100%; font-size: 17px; text-transform: uppercase; cursor: pointer; transition: 0.2s; }
+        .btn-trade:active { transform: scale(0.96); }
         
         .chart-container { height: 180px; margin: 15px 0; position: relative; }
         .future-blur { position: absolute; right: 0; top: 0; width: 45%; height: 100%; background: linear-gradient(90deg, transparent, rgba(0,0,0,0.96) 80%); backdrop-filter: blur(6px); display: flex; align-items: center; justify-content: center; color: var(--accent); font-size: 11px; font-weight: bold; text-align: center; border-radius: 0 22px 22px 0; }
@@ -32,7 +33,7 @@
     <div style="background: rgba(50,215,75,0.15); color: var(--accent); display: inline-block; padding: 4px 12px; border-radius: 8px; font-size: 11px; font-weight: bold; margin-bottom: 10px;">SYSTEM: ACTIVE</div>
     <span class="label">Body Net Worth</span>
     <div class="net-worth" id="net-worth-val">1000.00</div>
-    <div style="color: var(--accent); font-weight: bold; font-size: 13px;" id="prediction-msg">Синхронизация...</div>
+    <div style="color: var(--accent); font-weight: bold; font-size: 13px;" id="prediction-msg">Синхронизация с облаком...</div>
     
     <div class="chart-container">
         <canvas id="predictionChart"></canvas>
@@ -63,21 +64,19 @@
     const tg = window.Telegram.WebApp;
     tg.expand();
 
-    // Данные Supabase
+    // --- КЛЮЧИ (ЗАМЕНИ НА СВОИ) ---
     const S_URL = 'https://zgsvtvbwgbxyztyxynez.supabase.co'.trim(); 
-    const S_KEY = 'sb_publishable_HPZQa10In3R3s6siI4ttAQ_QpWWZmgS'.trim(); 
+    const S_KEY = 'ВСТАВЬ_СЮДА_ANON_KEY'.trim(); 
     
     const supabaseClient = supabase.createClient(S_URL, S_KEY);
-    // Принудительно превращаем ID в строку, чтобы база не ругалась на UUID
-    const userId = String(tg.initDataUnsafe?.user?.id || "demo_user_777"); 
+    const userId = String(tg.initDataUnsafe?.user?.id || "demo_777"); 
     let chart;
 
     async function loadDashboard() {
         try {
-            // Вызываем функцию прогноза (t_user_id теперь принимает текст)
+            // ВНИМАНИЕ: тут теперь t_user_id, как в твоем SQL-редакторе
             const { data: pred } = await supabaseClient.rpc('get_prediction_data', { t_user_id: userId });
             
-            // Считаем тренировки для Дисциплины
             const { count: sessions } = await supabaseClient
                 .from('workouts')
                 .select('*', { count: 'exact', head: true })
@@ -93,7 +92,6 @@
             document.getElementById('dis-val').innerText = discipline.toFixed(1);
             document.getElementById('prediction-msg').innerText = `Прогноз (60д): ${Math.round(f60)} кг`;
 
-            // Убираем блюр, если есть прогресс
             if ((sessions || 0) >= 3) {
                 document.getElementById('blur-overlay').style.display = 'none';
             }
@@ -107,7 +105,6 @@
     async function handleTrade() {
         const w = parseFloat(document.getElementById('w').value);
         const r = parseInt(document.getElementById('r').value);
-        
         if(!w || !r) {
             tg.showAlert("Заполни данные сделки!");
             return;
@@ -125,13 +122,11 @@
 
             tg.HapticFeedback.notificationOccurred('success');
             tg.showAlert("СДЕЛКА ЗАКРЫТА: ИНВЕСТИЦИЯ ПРИНЯТА");
-            
             document.getElementById('w').value = '';
             document.getElementById('r').value = '';
-            
             loadDashboard();
         } catch (err) {
-            tg.showAlert("Ошибка: " + err.message);
+            tg.showAlert("Ошибка базы: " + err.message);
         }
     }
 

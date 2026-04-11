@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>GymProgress Ultimate</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root { --bg: #000; --card: #151517; --accent: #32d74b; --blue: #0a84ff; --danger: #ff453a; --gray: #8e8e93; }
+        body { font-family: -apple-system, sans-serif; background: var(--bg); color: #fff; margin: 0; padding: 10px; }
+        .card { background: var(--card); padding: 18px; border-radius: 20px; border: 1px solid #222; margin-bottom: 12px; }
+        .status-badge { display: inline-block; padding: 4px 10px; border-radius: 8px; font-size: 11px; font-weight: bold; background: rgba(50, 215, 75, 0.15); color: var(--accent); margin-bottom: 10px; }
+        .net-worth { font-size: 42px; font-weight: 900; letter-spacing: -2px; margin: 5px 0; }
+        .stats-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 15px 0; }
+        .stat-box { background: #1c1c1e; padding: 12px; border-radius: 15px; border: 1px solid #2c2c2e; }
+        .label { font-size: 9px; color: var(--gray); text-transform: uppercase; display: block; }
+        .val { font-size: 18px; font-weight: 800; }
+        input, select { background: #1c1c1e; border: 1px solid #333; color: #fff; padding: 14px; border-radius: 12px; font-size: 16px; width: 100%; box-sizing: border-box; outline: none; margin-bottom: 10px; }
+        .btn-trade { background: var(--accent); color: #000; border: none; padding: 18px; border-radius: 16px; font-weight: 900; width: 100%; font-size: 16px; text-transform: uppercase; cursor: pointer; }
+        .chart-container { height: 160px; margin: 10px 0; }
+    </style>
+</head>
+<body>
+
+<div class="card" style="text-align: center;">
+    <div id="status-tag" class="status-badge">READY</div>
+    <span class="label">Body Net Worth</span>
+    <div class="net-worth" id="total-val">0.00</div>
+    <div class="chart-container"><canvas id="mainChart"></canvas></div>
+</div>
+
+<div class="stats-row">
+    <div class="stat-box"><span class="label">Strength Index</span><div class="val" id="str-val">0.0</div></div>
+    <div class="stat-box"><span class="label">Discipline</span><div class="val" id="dis-val">0.0</div></div>
+</div>
+
+<div class="card">
+    <h3 style="margin:0 0 12px 0; font-size:12px; color:var(--gray)">ОТКРЫТЬ ПОЗИЦИЮ (ТРЕНИРОВКА)</h3>
+    <select id="ex">
+        <optgroup label="Грудь">
+            <option value="chest_bench">Жим штанги</option>
+            <option value="chest_db">Жим гантелей</option>
+        </optgroup>
+        <optgroup label="Спина">
+            <option value="back_row">Тяга штанги</option>
+            <option value="pullups">Подтягивания</option>
+        </optgroup>
+        <optgroup label="Ноги">
+            <option value="squat">Приседания</option>
+            <option value="leg_press">Жим ногами</option>
+        </optgroup>
+    </select>
+    <div style="display:flex; gap:10px;">
+        <input type="number" id="w" placeholder="Вес кг">
+        <input type="number" id="r" placeholder="Повторы">
+    </div>
+    <button class="btn-trade" onclick="doTrade()">Confirm Investment</button>
+</div>
+
+<script>
+    const tg = window.Telegram.WebApp;
+    tg.expand();
+
+    // ВСТАВЬ СВОИ ДАННЫЕ СЮДА
+    const S_URL = 'https://zgsvtvbwgbxyztyxynez.supabase.co';
+    const S_KEY = 'sb_publishable_HPZQa10In3R3s6siI4ttAQ_QpWWZmgS'; // твой anon key
+
+    const supabaseClient = supabase.createClient(S_URL, S_KEY);
+    const userId = tg.initDataUnsafe?.user?.id || "local_user_777";
+
+    let myChart;
+
+    async function loadData() {
+        // Запрос данных через твою функцию SQL
+        const { data, error } = await supabaseClient.rpc('get_prediction_data', { user_id: userId });
+        if (data) {
+            document.getElementById('total-val').innerText = (data.current + 1000).toFixed(2);
+            document.getElementById('str-val').innerText = data.current.toFixed(1);
+            document.getElementById('dis-val').innerText = "100.0";
+            renderChart(data.current, data.forecast_30d, data.forecast_60d);
+        }
+    }
+
+    async function doTrade() {
+        const w = parseFloat(document.getElementById('w').value);
+        const r = parseInt(document.getElementById('r').value);
+        if(!w || !r) return tg.showAlert("Заполни данные!");
+
+        const { error } = await supabaseClient.from('workouts').insert([{
+            user_id: userId, exercise: document.getElementById('ex').value,
+            weight: w, reps: r
+        }]);
+
+        if(!error) {
+            tg.HapticFeedback.notificationOccurred('success');
+            tg.showAlert("ИНВЕСТИЦИЯ ПРИНЯТА!");
+            loadData();
+        } else {
+            tg.showAlert("Ошибка: " + error.message);
+        }
+    }
+
+    function renderChart(curr, f30, f60) {
+        const ctx = document.getElementById('mainChart').getContext('2d');
+        if (myChart) myChart.destroy();
+        myChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: ['Сейчас', '30д', '60д'],
+                datasets: [{
+                    data: [curr, f30, f60],
+                    borderColor: '#32d74b',
+                    borderDash: [5, 5],
+                    tension: 0.3,
+                    fill: true,
+                    backgroundColor: 'rgba(50, 215, 75, 0.05)'
+                }]
+            },
+            options: { scales: { y: { display: false }, x: { grid: { display: false } } }, plugins: { legend: { display: false } } }
+        });
+    }
+
+    window.onload = loadData;
+</script>
+</body>
+</html>

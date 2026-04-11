@@ -1,87 +1,57 @@
 <!DOCTYPE html>
-<html lang="ru">
+<html>
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>GymProgress AI</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gym AI</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
-        :root { --bg: #000; --card: #121214; --accent: #32d74b; --gray: #8e8e93; }
-        body { font-family: sans-serif; background: var(--bg); color: #fff; margin: 0; padding: 12px; overflow: hidden; }
-        .header { padding: 30px 15px; background: #1c1c1e; border-radius: 28px; text-align: center; margin-bottom: 12px; border: 1px solid #222; }
-        .net-worth { font-size: 54px; font-weight: 900; margin: 5px 0; }
-        .asset-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px; }
-        .asset-box { background: var(--card); padding: 15px; border-radius: 20px; border: 1px solid #222; }
-        .label { font-size: 9px; color: var(--gray); text-transform: uppercase; display: block; margin-bottom: 4px; }
-        .val { font-size: 20px; font-weight: 800; }
-        input, select { background: #1c1c1e; border: 1px solid #333; color: #fff; padding: 16px; border-radius: 14px; font-size: 16px; width: 100%; box-sizing: border-box; margin-bottom: 10px; }
-        .btn-trade { background: var(--accent); color: #000; border: none; padding: 20px; border-radius: 18px; font-weight: 900; width: 100%; font-size: 17px; cursor: pointer; }
-        .chart-container { height: 160px; margin: 15px 0; position: relative; }
-        .future-blur { position: absolute; right: 0; top: 0; width: 45%; height: 100%; background: linear-gradient(90deg, transparent, rgba(0,0,0,0.95) 80%); backdrop-filter: blur(6px); display: flex; align-items: center; justify-content: center; color: var(--accent); font-size: 10px; font-weight: bold; text-align: center; border-radius: 0 20px 20px 0; }
+        body { font-family: sans-serif; background: #000; color: #fff; margin: 0; padding: 15px; text-align: center; }
+        .card { background: #121214; padding: 20px; border-radius: 20px; border: 1px solid #222; margin-bottom: 15px; }
+        .val { font-size: 45px; font-weight: 900; color: #32d74b; margin: 10px 0; }
+        input { background: #1c1c1e; border: 1px solid #333; color: #fff; padding: 15px; border-radius: 12px; width: 100%; box-sizing: border-box; margin-bottom: 10px; }
+        .btn { background: #32d74b; color: #000; border: none; padding: 18px; border-radius: 15px; font-weight: 900; width: 100%; cursor: pointer; }
+        canvas { max-height: 150px; }
     </style>
 </head>
 <body>
-<div class="header">
-    <span class="label">Body Net Worth</span>
-    <div class="net-worth" id="nw">1000.00</div>
-    <div style="color:var(--accent);font-size:13px;font-weight:bold" id="msg">SYSTEM ONLINE</div>
-    <div class="chart-container">
-        <canvas id="chart"></canvas>
-        <div class="future-blur" id="blur">FUTURE LOCKED</div>
+    <div class="card">
+        <div style="font-size: 10px; color: #888;">NET WORTH</div>
+        <div class="val" id="nw">1000.00</div>
+        <canvas id="c"></canvas>
     </div>
-</div>
-<div class="asset-row">
-    <div class="asset-box"><span class="label">Strength Index</span><div class="val" id="si">0.0</div></div>
-    <div class="asset-box"><span class="label">Discipline</span><div class="val" id="di">0.0</div></div>
-</div>
-<div class="asset-box">
-    <select id="ex"><option value="bench">Bench Press</option><option value="squat">Squat</option></select>
-    <div style="display:flex;gap:10px"><input type="number" id="w" placeholder="Weight"><input type="number" id="r" placeholder="Reps"></div>
-    <button class="btn-trade" onclick="doTrade()">CONFIRM TRADE</button>
-</div>
+    <div class="card">
+        <input type="number" id="w" placeholder="Weight (kg)">
+        <input type="number" id="r" placeholder="Reps">
+        <button class="btn" onclick="add()">CONFIRM TRADE</button>
+    </div>
 <script>
     const tg = window.Telegram.WebApp;
-    const S_URL = 'https://zgsvtvbwgbxyztyxynez.supabase.co';
-    const S_KEY = 'sb_publishable_HPZQa10In3R3s6siI4ttAQ_QpWWZmgS';
-    const client = supabase.createClient(S_URL, S_KEY);
+    const sb = supabase.createClient('https://zgsvtvbwgbxyztyxynez.supabase.co', 'sb_publishable_HPZQa10In3R3s6siI4ttAQ_QpWWZmgS');
     const uid = String(tg.initDataUnsafe?.user?.id || "796100711");
-    let myChart;
+    let chart;
 
-    async function refresh() {
-        try {
-            const { data: pr } = await client.rpc('get_prediction_data', { t_user_id: uid });
-            const { count: s } = await client.from('workouts').select('*', { count: 'exact', head: true }).eq('user_id', uid);
-            const cur = pr?.current || 0;
-            const d = (s || 0) * 10;
-            document.getElementById('nw').innerText = (1000 + cur + d).toFixed(2);
-            document.getElementById('si').innerText = cur.toFixed(1);
-            document.getElementById('di').innerText = d.toFixed(1);
-            if (s >= 3) document.getElementById('blur').style.display = 'none';
-            updateGraph(cur, cur+10, cur+20);
-        } catch (e) { console.log(e); }
+    async function load() {
+        const { data: p } = await sb.rpc('get_prediction_data', { t_user_id: uid });
+        const { count: n } = await sb.from('workouts').select('*', { count: 'exact', head: true }).eq('user_id', uid);
+        const cur = p?.current || 0;
+        document.getElementById('nw').innerText = (1000 + cur + (n*10)).toFixed(2);
+        const ctx = document.getElementById('c').getContext('2d');
+        if(chart) chart.destroy();
+        chart = new Chart(ctx, { type: 'line', data: { labels: ['Now', '30d', '60d'], datasets: [{ data: [cur, cur+10, cur+20], borderColor: '#32d74b' }] }, options: { plugins: { legend: { display: false } }, scales: { y: { display: false } } } });
     }
 
-    async function doTrade() {
-        const w = parseFloat(document.getElementById('w').value);
-        const r = parseInt(document.getElementById('r').value);
-        if(!w || !r) return alert("Enter data");
-        await client.from('workouts').insert([{ user_id: uid, weight: w, reps: r, exercise: document.getElementById('ex').value }]);
+    async function add() {
+        const weight = document.getElementById('w').value;
+        const reps = document.getElementById('r').value;
+        if(!weight || !reps) return;
+        await sb.from('workouts').insert([{ user_id: uid, weight: weight, reps: reps, exercise: 'bench' }]);
         tg.HapticFeedback.notificationOccurred('success');
-        refresh();
+        load();
     }
-
-    function updateGraph(c, f1, f2) {
-        const ctx = document.getElementById('chart').getContext('2d');
-        if(myChart) myChart.destroy();
-        myChart = new Chart(ctx, {
-            type: 'line',
-            data: { labels: ['Now', '30d', '60d'], datasets: [{ data: [c, f1, f2], borderColor: '#32d74b', tension: 0.4 }] },
-            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { display: true }, y: { display: false } } }
-        });
-    }
-    window.onload = refresh;
+    window.onload = load;
 </script>
 </body>
 </html>

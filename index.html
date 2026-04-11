@@ -3,90 +3,178 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>GymProgress AI Unicorn</title>
+    <title>GymProgress AI v5</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
-        :root { --bg: #000; --card: #121214; --accent: #32d74b; --gray: #8e8e93; }
-        body { font-family: -apple-system, sans-serif; background: var(--bg); color: #fff; margin: 0; padding: 12px; overflow: hidden; }
-        .header { padding: 25px 15px; background: linear-gradient(180deg, #1c1c1e 0%, #000 100%); border-radius: 28px; border: 1px solid #222; text-align: center; margin-bottom: 12px; }
-        .net-worth { font-size: 52px; font-weight: 900; letter-spacing: -2px; margin: 5px 0; color: #fff; }
-        .asset-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px; }
-        .asset-box { background: var(--card); padding: 15px; border-radius: 20px; border: 1px solid #222; }
-        .label { font-size: 9px; color: var(--gray); text-transform: uppercase; letter-spacing: 1px; display: block; margin-bottom: 4px; }
-        .val { font-size: 19px; font-weight: 800; }
-        input, select { background: #1c1c1e; border: 1px solid #333; color: #fff; padding: 15px; border-radius: 14px; width: 100%; box-sizing: border-box; margin-bottom: 8px; font-size: 16px; }
-        .btn-trade { background: var(--accent); color: #000; border: none; padding: 18px; border-radius: 18px; font-weight: 900; width: 100%; font-size: 16px; text-transform: uppercase; cursor: pointer; }
-        .chart-container { height: 150px; margin: 10px 0; position: relative; }
-        .future-blur { position: absolute; right: 0; top: 0; width: 45%; height: 100%; background: linear-gradient(90deg, transparent, rgba(0,0,0,0.97) 80%); backdrop-filter: blur(5px); display: flex; align-items: center; justify-content: center; color: var(--accent); font-size: 9px; font-weight: bold; text-align: center; border-radius: 0 20px 20px 0; }
+        :root { --bg: #000; --card: #0a0a0b; --accent: #32d74b; --warning: #ff3b30; --gray: #8e8e93; --gold: #ffd700; }
+        body { font-family: 'SF Mono', 'Fira Code', monospace; background: var(--bg); color: #fff; margin: 0; padding: 12px; overflow-x: hidden; }
+        
+        /* HEADER - CAPITAL VIEW */
+        .header { padding: 35px 15px; background: linear-gradient(180deg, #111 0%, #000 100%); border-radius: 30px; border: 1px solid #222; text-align: center; margin-bottom: 15px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+        .net-worth { font-size: 58px; font-weight: 900; letter-spacing: -3px; color: #fff; margin: 10px 0; font-variant-numeric: tabular-nums; }
+        .streak-badge { position: absolute; top: 15px; right: 20px; background: rgba(50,215,75,0.1); color: var(--accent); padding: 5px 12px; border-radius: 20px; font-size: 11px; font-weight: bold; border: 1px solid var(--accent); }
+        
+        /* ASSET CARDS */
+        .asset-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 15px; }
+        .asset-box { background: var(--card); padding: 18px; border-radius: 22px; border: 1px solid #1c1c1e; position: relative; overflow: hidden; }
+        .asset-box::after { content: ''; position: absolute; top: 0; left: 0; width: 100%; height: 2px; background: var(--accent); opacity: 0.3; }
+        .label { font-size: 10px; color: var(--gray); text-transform: uppercase; letter-spacing: 1.5px; display: block; margin-bottom: 6px; }
+        .val { font-size: 24px; font-weight: 800; }
+        .delta { font-size: 11px; color: var(--accent); font-weight: bold; }
+
+        /* INPUTS & CONTROLS */
+        .trade-panel { background: var(--card); padding: 20px; border-radius: 25px; border: 1px solid #222; margin-top: 10px; }
+        select, input { background: #161618; border: 1px solid #2c2c2e; color: #fff; padding: 18px; border-radius: 16px; font-size: 16px; width: 100%; box-sizing: border-box; outline: none; margin-bottom: 12px; transition: 0.3s; }
+        select:focus, input:focus { border-color: var(--accent); }
+        .btn-trade { background: var(--accent); color: #000; border: none; padding: 22px; border-radius: 20px; font-weight: 900; width: 100%; font-size: 18px; text-transform: uppercase; cursor: pointer; box-shadow: 0 4px 15px rgba(50,215,75,0.3); }
+
+        /* CHARTS */
+        .chart-container { height: 180px; margin: 20px 0; position: relative; }
+        .blur-lock { position: absolute; right: 0; top: 0; width: 50%; height: 100%; background: linear-gradient(90deg, transparent, rgba(0,0,0,0.98) 90%); backdrop-filter: blur(8px); display: flex; align-items: center; justify-content: center; color: var(--accent); font-size: 12px; font-weight: bold; text-align: center; border-radius: 0 22px 22px 0; z-index: 10; border-left: 1px solid rgba(50,215,75,0.2); }
     </style>
 </head>
 <body>
+
 <div class="header">
-    <span class="label">Body Net Worth</span>
-    <div class="net-worth" id="nw">1000.00</div>
-    <div id="msg" style="color:var(--accent); font-size:12px; font-weight:bold;">АНАЛИЗ РЫНКА ТЕЛА...</div>
+    <div class="streak-badge" id="streak-val">STREAK: 0</div>
+    <span class="label">Body Capital (NW)</span>
+    <div class="net-worth" id="total-nw">1000.00</div>
+    <div style="color: var(--accent); font-size: 13px; letter-spacing: 1px;" id="prediction-msg">PROJECTION: LOADING...</div>
+    
     <div class="chart-container">
-        <canvas id="ch"></canvas>
-        <div class="future-blur" id="bl">FUTURE LOCKED<br>НУЖНО 3 ЗАПИСИ</div>
+        <canvas id="predictionChart"></canvas>
+        <div class="blur-lock" id="future-lock">60D FORECAST<br>LOCKED</div>
     </div>
 </div>
+
 <div class="asset-row">
-    <div class="asset-box"><span class="label">Индекс Силы</span><div class="val" id="si">0.0</div></div>
-    <div class="asset-box"><span class="label">Дисциплина</span><div class="val" id="di">0.0</div></div>
-</div>
-<div class="asset-box">
-    <select id="ex">
-        <option value="bench">Жим штанги</option>
-        <option value="squat">Приседания</option>
-        <option value="deadlift">Становая тяга</option>
-        <option value="pullups">Подтягивания</option>
-    </select>
-    <div style="display:flex; gap:8px;">
-        <input type="number" id="w" placeholder="Вес">
-        <input type="number" id="r" placeholder="Повторы">
+    <div class="asset-box">
+        <span class="label">Strength Index</span>
+        <div class="val" id="str-idx">0.0</div>
+        <div class="delta" id="str-delta">+0.0%</div>
     </div>
-    <button class="btn-trade" onclick="add()">ПОДТВЕРДИТЬ СДЕЛКУ</button>
+    <div class="asset-box">
+        <span class="label">Discipline</span>
+        <div class="val" id="dis-idx">0.0</div>
+        <div class="delta" id="dis-delta">STABLE</div>
+    </div>
 </div>
+
+<div class="trade-panel">
+    <span class="label" style="margin-bottom: 15px;">New Market Order</span>
+    <select id="ex-select">
+        <optgroup label="ГРУДЬ / ПЛЕЧИ">
+            <option value="bench_press">Жим штанги (Грудь)</option>
+            <option value="incline_press">Жим в наклоне</option>
+            <option value="ohp">Жим стоя (Армейский)</option>
+        </optgroup>
+        <optgroup label="СПИНА / НОГИ">
+            <option value="deadlift">Становая тяга</option>
+            <option value="squat">Приседания</option>
+            <option value="pullups">Подтягивания (Вес)</option>
+            <option value="rows">Тяга штанги</option>
+        </optgroup>
+        <optgroup label="РУКИ">
+            <option value="biceps">Бицепс штанга</option>
+            <option value="dips">Брусья (Вес)</option>
+        </optgroup>
+    </select>
+    
+    <div style="display:flex; gap:12px;">
+        <input type="number" id="weight-input" placeholder="Weight (kg)" step="0.5">
+        <input type="number" id="reps-input" placeholder="Reps">
+    </div>
+    <button class="btn-trade" onclick="executeTrade()">Confirm Investment</button>
+</div>
+
 <script>
     const tg = window.Telegram.WebApp;
     const sb = supabase.createClient('https://zgsvtvbwgbxyztyxynez.supabase.co', 'sb_publishable_HPZQa10In3R3s6siI4ttAQ_QpWWZmgS');
     const uid = String(tg.initDataUnsafe?.user?.id || "796100711");
     let chart;
 
-    async function load() {
+    async function sync() {
+        // 1. Получаем данные через RPC (прогноз)
         const { data: p } = await sb.rpc('get_prediction_data', { t_user_id: uid });
+        // 2. Считаем количество сделок (тренировок)
         const { count: n } = await sb.from('workouts').select('*', { count: 'exact', head: true }).eq('user_id', uid);
+        
         const cur = p?.current || 0;
-        const d_v = (n || 0) * 15;
-        document.getElementById('nw').innerText = (1000 + cur + d_v).toFixed(2);
-        document.getElementById('si').innerText = cur.toFixed(1);
-        document.getElementById('di').innerText = d_v.toFixed(1);
-        if (n >= 3) document.getElementById('bl').style.display = 'none';
-        showChart(cur, cur+10, cur+20);
+        const f30 = cur + 10; // Simple Engine 4.3
+        const f60 = cur + 20;
+        const discipline = (n || 0) * 15.5;
+
+        // UI Update
+        document.getElementById('total-nw').innerText = (1000 + cur + discipline).toFixed(2);
+        document.getElementById('str-idx').innerText = cur.toFixed(1);
+        document.getElementById('dis-idx').innerText = discipline.toFixed(1);
+        document.getElementById('streak-val').innerText = `STREAK: ${n}`;
+        
+        // CEO Logic: Unlock future
+        if (n >= 3) {
+            document.getElementById('future-lock').style.display = 'none';
+            document.getElementById('prediction-msg').innerText = `60D TARGET: ${(cur+20).toFixed(1)} KG`;
+        } else {
+            document.getElementById('prediction-msg').innerText = `UNLOCK FUTURE IN ${3-n} WORKOUTS`;
+        }
+
+        updateChart(cur, f30, f60);
     }
 
-    async function add() {
-        const weight = document.getElementById('w').value;
-        const reps = document.getElementById('r').value;
-        if(!weight || !reps) return;
-        await sb.from('workouts').insert([{ user_id: uid, weight: weight, reps: reps, exercise: document.getElementById('ex').value }]);
-        tg.HapticFeedback.notificationOccurred('success');
-        document.getElementById('w').value = '';
-        load();
+    async function executeTrade() {
+        const w = parseFloat(document.getElementById('weight-input').value);
+        const r = parseInt(document.getElementById('reps-input').value);
+        if(!w || !r) return;
+
+        const { error } = await sb.from('workouts').insert([{
+            user_id: uid,
+            exercise: document.getElementById('ex-select').value,
+            weight: w,
+            reps: r
+        }]);
+
+        if(!error) {
+            tg.HapticFeedback.notificationOccurred('success');
+            // Эффект CEO: Очистка полей после сделки
+            document.getElementById('weight-input').value = '';
+            document.getElementById('reps-input').value = '';
+            sync();
+        }
     }
 
-    function showChart(v, f1, f2) {
-        const ctx = document.getElementById('ch').getContext('2d');
+    function updateChart(c, f1, f2) {
+        const ctx = document.getElementById('predictionChart').getContext('2d');
         if(chart) chart.destroy();
         chart = new Chart(ctx, {
             type: 'line',
-            data: { labels: ['Сейчас', '30д', '60д'], datasets: [{ data: [v, f1, f2], borderColor: '#32d74b', tension: 0.4, fill: true, backgroundColor: 'rgba(50,215,75,0.05)' }] },
-            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { display: false }, x: { ticks: { color: '#888' } } } }
+            data: {
+                labels: ['NOW', '30D', '60D'],
+                datasets: [{
+                    data: [c, f1, f2],
+                    borderColor: '#32d74b',
+                    borderWidth: 4,
+                    pointBackgroundColor: '#32d74b',
+                    pointRadius: 6,
+                    tension: 0.4,
+                    fill: true,
+                    backgroundColor: 'rgba(50, 215, 75, 0.05)'
+                }]
+            },
+            options: {
+                responsive: true, maintainAspectRatio: false,
+                scales: { 
+                    y: { display: false }, 
+                    x: { grid: { color: '#1c1c1e' }, ticks: { color: '#8e8e93', font: { weight: 'bold' } } } 
+                },
+                plugins: { legend: { display: false } }
+            }
         });
     }
-    window.onload = load;
+
+    tg.expand();
+    window.onload = sync;
 </script>
 </body>
 </html>

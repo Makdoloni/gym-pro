@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>GymProgress AI v29</title>
+    <title>GymProgress AI v30</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -11,21 +11,20 @@
         :root { --bg: #000; --card: #111; --accent: #32d74b; --gray: #666; }
         body { font-family: -apple-system, sans-serif; background: var(--bg); color: #fff; margin: 0; padding: 15px; }
         
-        /* Главный экран ценности */
-        .capital-card { background: linear-gradient(160deg, #1a1a1a 0%, #000 100%); border-radius: 30px; padding: 30px 15px; border: 1px solid #222; text-align: center; margin-bottom: 15px; box-shadow: 0 10px 40px rgba(0,0,0,0.8); }
+        .capital-card { background: linear-gradient(160deg, #1a1a1a 0%, #000 100%); border-radius: 30px; padding: 30px 15px; border: 1px solid #222; text-align: center; margin-bottom: 15px; position: relative; overflow: hidden; }
         .price { font-size: 60px; font-weight: 900; letter-spacing: -3px; color: var(--accent); margin: 5px 0; }
         .label { font-size: 10px; color: var(--gray); text-transform: uppercase; letter-spacing: 2px; }
 
-        /* График с блокировкой */
-        .chart-box { height: 160px; margin: 20px 0; position: relative; border-radius: 20px; overflow: hidden; background: rgba(255,255,255,0.02); }
-        .blur-overlay { position: absolute; right: 0; top: 0; width: 50%; height: 100%; background: linear-gradient(90deg, transparent, #000 90%); backdrop-filter: blur(10px); display: flex; align-items: center; justify-content: center; color: var(--accent); font-size: 11px; font-weight: bold; text-align: center; }
+        /* Визуальный блок упражнения */
+        .exercise-preview { background: #1c1c1e; border-radius: 20px; padding: 20px; margin-bottom: 15px; border: 1px solid #333; display: flex; align-items: center; gap: 20px; }
+        .ex-icon { font-size: 40px; background: rgba(50,215,75,0.1); padding: 15px; border-radius: 15px; }
+        .ex-info { text-align: left; }
+        .ex-title { font-weight: bold; font-size: 18px; display: block; }
+        .ex-muscle { font-size: 12px; color: var(--accent); text-transform: uppercase; }
 
-        /* Индексы */
-        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 20px; }
-        .box { background: var(--card); padding: 15px; border-radius: 22px; border: 1px solid #222; }
-        .box-val { font-size: 22px; font-weight: 800; margin-top: 5px; }
+        .chart-box { height: 140px; margin: 15px 0; position: relative; }
+        .blur-overlay { position: absolute; right: 0; top: 0; width: 50%; height: 100%; background: linear-gradient(90deg, transparent, #000 90%); backdrop-filter: blur(8px); display: flex; align-items: center; justify-content: center; color: var(--accent); font-size: 11px; font-weight: bold; text-align: center; }
 
-        /* Панель управления (как на Powermens) */
         .trade-panel { background: var(--card); padding: 20px; border-radius: 28px; border: 1px solid #222; }
         select, input { background: #1c1c1e; border: 1px solid #333; color: #fff; padding: 16px; border-radius: 14px; width: 100%; box-sizing: border-box; margin-bottom: 10px; font-size: 16px; outline: none; }
         .btn-action { background: var(--accent); color: #000; border: none; padding: 20px; border-radius: 18px; font-weight: 900; width: 100%; font-size: 17px; text-transform: uppercase; cursor: pointer; }
@@ -36,49 +35,33 @@
 <div class="capital-card">
     <span class="label">Body Net Worth</span>
     <div class="price" id="nw">1000.00</div>
-    <div style="font-size: 12px; color: #8e8e93;" id="prediction-text">Прогноз: анализ...</div>
-    
     <div class="chart-box">
         <canvas id="chart"></canvas>
-        <div class="blur-overlay" id="lock">БУДУЩЕЕ ЗАБЛОКИРОВАНО<br>Нужно еще 2 тренировки</div>
+        <div class="blur-overlay" id="lock">FUTURE LOCKED<br>Нужно 3 записи</div>
     </div>
 </div>
 
-<div class="grid">
-    <div class="box"><span class="label">Индекс Силы</span><div class="box-val" id="si">0.0</div></div>
-    <div class="box"><span class="label">Дисциплина</span><div class="box-val" id="di">0.0</div></div>
+<div class="exercise-preview" id="preview-box">
+    <div class="ex-icon" id="ex-emoji">🏋️‍♂️</div>
+    <div class="ex-info">
+        <span class="ex-title" id="ex-display-name">Жим штанги</span>
+        <span class="ex-muscle" id="ex-display-muscle">Целевая группа: ГРУДЬ</span>
+    </div>
 </div>
 
 <div class="trade-panel">
-    <span class="label" style="display:block; margin-bottom:15px;">Открыть позицию</span>
-    <select id="exercise">
-        <optgroup label="ГРУДЬ">
-            <option value="bench_barbell">Жим штанги лежа</option>
-            <option value="bench_dumbbells">Жим гантелей</option>
-        </optgroup>
-        <optgroup label="СПИНА">
-            <option value="deadlift">Становая тяга</option>
-            <option value="pullups">Подтягивания</option>
-            <option value="lat_pulldown">Тяга верхнего блока</option>
-        </optgroup>
-        <optgroup label="НОГИ">
-            <option value="squat">Приседания со штангой</option>
-            <option value="leg_press">Жим ногами</option>
-        </optgroup>
-        <optgroup label="ПЛЕЧИ">
-            <option value="ohp">Жим штанги стоя</option>
-            <option value="side_raises">Разводка гантелей</option>
-        </optgroup>
-        <optgroup label="РУКИ">
-            <option value="biceps">Бицепс со штангой</option>
-            <option value="triceps">Французский жим</option>
-        </optgroup>
+    <select id="exercise" onchange="updatePreview()">
+        <option value="bench" data-emoji="💪" data-name="Жим штанги" data-muscle="ГРУДЬ">Жим штанги (Грудь)</option>
+        <option value="squat" data-emoji="🦵" data-name="Приседания" data-muscle="НОГИ">Приседания (Ноги)</option>
+        <option value="deadlift" data-emoji="🧱" data-name="Становая тяга" data-muscle="СПИНА">Становая тяга (Спина)</option>
+        <option value="pullups" data-emoji="🦇" data-name="Подтягивания" data-muscle="ВЕРХ СПИНЫ">Подтягивания (Спина)</option>
+        <option value="biceps" data-emoji="🚀" data-name="Бицепс" data-muscle="РУКИ">Бицепс (Руки)</option>
     </select>
     <div style="display:flex; gap:10px;">
-        <input type="number" id="weight" placeholder="Вес (кг)">
+        <input type="number" id="weight" placeholder="Вес">
         <input type="number" id="reps" placeholder="Повторы">
     </div>
-    <button class="btn-action" onclick="makeTrade()">Подтвердить инвестицию</button>
+    <button class="btn-action" onclick="makeTrade()">Зафиксировать прибыль</button>
 </div>
 
 <script>
@@ -87,24 +70,20 @@
     const uid = String(tg.initDataUnsafe?.user?.id || "796100711");
     let myChart;
 
+    function updatePreview() {
+        const sel = document.getElementById('exercise');
+        const opt = sel.options[sel.selectedIndex];
+        document.getElementById('ex-emoji').innerText = opt.dataset.emoji;
+        document.getElementById('ex-display-name').innerText = opt.dataset.name;
+        document.getElementById('ex-display-muscle').innerText = "Целевая группа: " + opt.dataset.muscle;
+    }
+
     async function sync() {
         const { data: p } = await sb.rpc('get_prediction_data', { t_user_id: uid });
         const { count: n } = await sb.from('workouts').select('*', { count: 'exact', head: true }).eq('user_id', uid);
-        
         const cur = p?.current || 0;
-        const discipline = (n || 0) * 15;
-        
-        document.getElementById('nw').innerText = (1000 + cur + discipline).toFixed(2);
-        document.getElementById('si').innerText = cur.toFixed(1);
-        document.getElementById('di').innerText = discipline.toFixed(0);
-        
-        if (n >= 3) {
-            document.getElementById('lock').style.display = 'none';
-            document.getElementById('prediction-text').innerText = `Прогноз на 60 дней: +20.0 кг`;
-        } else {
-            document.getElementById('prediction-text').innerText = `Сделай еще ${3-n} тренировки для прогноза`;
-        }
-
+        document.getElementById('nw').innerText = (1000 + cur + (n*15)).toFixed(2);
+        if (n >= 3) document.getElementById('lock').style.display = 'none';
         draw(cur);
     }
 
@@ -112,11 +91,9 @@
         const w = document.getElementById('weight').value;
         const r = document.getElementById('reps').value;
         if(!w || !r) return;
-
         await sb.from('workouts').insert([{
             user_id: uid, weight: parseFloat(w), reps: parseInt(r), exercise: document.getElementById('exercise').value
         }]);
-
         tg.HapticFeedback.notificationOccurred('success');
         document.getElementById('weight').value = '';
         sync();
@@ -129,25 +106,13 @@
             type: 'line',
             data: {
                 labels: ['Сейчас', '30д', '60д'],
-                datasets: [{
-                    data: [v, v+10, v+20],
-                    borderColor: '#32d74b',
-                    tension: 0.4,
-                    fill: true,
-                    backgroundColor: 'rgba(50,215,75,0.05)',
-                    pointRadius: 5
-                }]
+                datasets: [{ data: [v, v+10, v+20], borderColor: '#32d74b', tension: 0.4, fill: true, backgroundColor: 'rgba(50,215,75,0.05)', pointRadius: 0 }]
             },
-            options: {
-                responsive: true, maintainAspectRatio: false,
-                plugins: { legend: { display: false } },
-                scales: { y: { display: false }, x: { ticks: { color: '#444' } } }
-            }
+            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { display: false }, x: { display: false } } }
         });
     }
 
-    tg.expand();
-    window.onload = sync;
+    window.onload = () => { sync(); updatePreview(); };
 </script>
 </body>
 </html>

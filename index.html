@@ -3,121 +3,145 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>GymProgress AI v32</title>
+    <title>GymProgress AI v33</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
-        :root { --bg: #000; --card: #0c0c0d; --accent: #32d74b; --dim: #8e8e93; }
-        body { font-family: 'SF Mono', monospace; background: var(--bg); color: #fff; margin: 0; padding: 12px; overflow: hidden; }
+        :root { --bg: #000; --card: #0c0c0d; --accent: #32d74b; --dim: #8e8e93; --danger: #ff3b30; }
+        body { font-family: 'SF Mono', monospace; background: var(--bg); color: #fff; margin: 0; padding: 12px; }
         
-        .header { padding: 25px 15px; background: linear-gradient(180deg, #161618 0%, #000 100%); border-radius: 30px; border: 1px solid #1c1c1e; text-align: center; margin-bottom: 12px; }
-        .price { font-size: 52px; font-weight: 900; letter-spacing: -2px; color: #fff; margin: 5px 0; }
+        .header { padding: 20px 10px; text-align: center; border-bottom: 1px solid #222; margin-bottom: 15px; }
         .label { font-size: 10px; color: var(--dim); text-transform: uppercase; letter-spacing: 2px; }
+        
+        /* Экран последней тренировки */
+        .last-workout-card { background: var(--card); border-radius: 24px; padding: 20px; border: 1px solid #222; margin-bottom: 15px; }
+        .ex-row { display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px solid #1a1a1a; }
+        .ex-row:last-child { border: none; }
+        .ex-info { display: flex; align-items: center; gap: 10px; }
+        .ex-val { font-weight: bold; color: var(--accent); }
 
-        /* Dynamic Exercise Unit */
-        .ex-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
-        .ex-item { background: var(--card); padding: 18px; border-radius: 20px; border: 1px solid #222; display: flex; align-items: center; gap: 15px; cursor: pointer; transition: 0.2s; }
-        .ex-item.active { border-color: var(--accent); background: rgba(50,215,75,0.05); }
-        .ex-emoji { font-size: 24px; }
-        .ex-name { font-weight: bold; font-size: 16px; flex-grow: 1; }
-        .ex-meta { font-size: 10px; color: var(--accent); font-weight: bold; text-transform: uppercase; }
-
-        /* Controls */
-        .trade-zone { background: var(--card); padding: 15px; border-radius: 25px; border: 1px solid #222; }
-        .refresh-btn { background: none; border: 1px solid #333; color: var(--dim); padding: 8px; border-radius: 10px; font-size: 10px; cursor: pointer; margin-bottom: 10px; width: 100%; }
-        .input-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px; }
-        input { background: #161618; border: 1px solid #222; color: #fff; padding: 15px; border-radius: 14px; width: 100%; box-sizing: border-box; text-align: center; font-size: 18px; outline: none; }
-        .btn-confirm { background: var(--accent); color: #000; border: none; padding: 20px; border-radius: 18px; font-weight: 900; width: 100%; font-size: 16px; text-transform: uppercase; cursor: pointer; }
+        /* Кнопки действий */
+        .btn-group { display: grid; grid-template-columns: 1fr; gap: 10px; }
+        .btn-main { background: var(--accent); color: #000; border: none; padding: 20px; border-radius: 18px; font-weight: 900; font-size: 16px; cursor: pointer; text-transform: uppercase; }
+        .btn-sec { background: #1a1a1c; color: #fff; border: 1px solid #333; padding: 15px; border-radius: 18px; font-size: 14px; cursor: pointer; }
+        
+        /* Модалка редактирования */
+        #editor { display: none; position: fixed; inset: 0; background: #000; padding: 20px; z-index: 100; }
+        .edit-item { background: #111; padding: 15px; border-radius: 15px; margin-bottom: 10px; display: flex; justify-content: space-between; }
+        .remove-btn { color: var(--danger); font-size: 12px; font-weight: bold; border: none; background: none; }
     </style>
 </head>
 <body>
 
-<div class="header">
-    <span class="label">Body Capital</span>
-    <div class="price" id="total-nw">1000.00</div>
-    <div id="muscle-title" style="font-size: 11px; color: var(--accent); font-weight: bold;">СЕГОДНЯ: ГРУДЬ / ПЛЕЧИ</div>
+<div id="main-screen">
+    <div class="header">
+        <span class="label">Твоя ценность растет</span>
+        <div style="font-size: 32px; font-weight: 900;" id="user-nw">1000.00</div>
+    </div>
+
+    <div class="label" style="margin-bottom: 10px; display: block;">Последняя тренировка</div>
+    <div class="last-workout-card" id="last-workout-container">
+        <div style="color: var(--dim); text-align: center; padding: 20px;">Загрузка истории...</div>
+    </div>
+
+    <div class="btn-group">
+        <button class="btn-main" onclick="repeatWorkout(true)">🚀 ПРИМЕНИТЬ ПРОГРЕСС (+2.5кг)</button>
+        <button class="btn-sec" onclick="repeatWorkout(false)">🔁 ПОВТОРИТЬ КАК БЫЛО</button>
+        <button class="btn-sec" onclick="openEditor()">⚙️ ИЗМЕНИТЬ СОСТАВ</button>
+    </div>
 </div>
 
-<button class="refresh-btn" onclick="rotateExercises()">🔄 ОБНОВИТЬ ВАРИАНТЫ</button>
-
-<div class="ex-list" id="display-list">
+<div id="editor">
+    <div class="header">
+        <span class="label">Редактор тренировки</span>
     </div>
-
-<div class="trade-zone">
-    <div class="input-row">
-        <input type="number" id="w" placeholder="ВЕС (КГ)">
-        <input type="number" id="r" placeholder="ПОВТОРЫ">
-    </div>
-    <button class="btn-confirm" onclick="save()">ПОДТВЕРДИТЬ СДЕЛКУ</button>
+    <div id="editor-list"></div>
+    <button class="btn-sec" onclick="closeEditor()" style="width: 100%; margin-top: 20px;">ВЕРНУТЬСЯ</button>
 </div>
 
 <script>
     const tg = window.Telegram.WebApp;
     const sb = supabase.createClient('https://zgsvtvbwgbxyztyxynez.supabase.co', 'sb_publishable_HPZQa10In3R3s6siI4ttAQ_QpWWZmgS');
     const uid = String(tg.initDataUnsafe?.user?.id || "796100711");
+    
+    let lastExercises = [];
 
-    // Exercise Base ≥ 30 (Requirement 2.2)
-    const db = [
-        {id:'bp', n:'Жим штанги', m:'chest', e:'💪'}, {id:'dp', n:'Жим гантелей', m:'chest', e:'🏋️'}, {id:'pu', n:'Отжимания', m:'chest', e:'🔥'},
-        {id:'if', n:'Разводка', m:'chest', e:'🦋'}, {id:'cc', n:'Кроссовер', m:'chest', e:'🔗'}, {id:'sq', n:'Приседания', m:'legs', e:'🦵'},
-        {id:'lp', n:'Жим ногами', m:'legs', e:'🚜'}, {id:'le', n:'Разгибания', m:'legs', e:'🦵'}, {id:'dl', n:'Становая тяга', m:'back', e:'🧱'},
-        {id:'pl', n:'Подтягивания', m:'back', e:'🦇'}, {id:'br', n:'Тяга в наклоне', m:'back', e:'🛶'}, {id:'oh', n:'Жим армейский', m:'shoulder', e:'🛡️'},
-        {id:'sr', n:'Боковые махи', m:'shoulder', e:'🦅'}, {id:'bc', n:'Бицепс штанга', m:'arms', e:'🚀'}, {id:'td', n:'Брусья', m:'arms', e:'⚓'}
-        // ... (в реальности здесь будет 30+, для краткости кода сократил)
-    ];
+    async function loadLastWorkout() {
+        // 6.1 Получаем последнюю сессию
+        const { data: workouts } = await sb.from('workouts')
+            .select('*')
+            .eq('user_id', uid)
+            .order('created_at', { ascending: false })
+            .limit(5);
 
-    let selectedId = 'bp';
-    let userHistory = [];
+        if (!workouts || workouts.length === 0) {
+            document.getElementById('last-workout-container').innerHTML = "Пока нет тренировок. Начни первую!";
+            return;
+        }
 
-    async function rotateExercises() {
-        const muscleGroups = ['chest', 'back', 'legs', 'shoulder', 'arms'];
-        const targetMuscle = muscleGroups[Math.floor(Date.now() / 86400000) % muscleGroups.length]; // Ротация по дням
-        
-        document.getElementById('muscle-title').innerText = `СЕГОДНЯ: ${targetMuscle.toUpperCase()}`;
-        
-        const all = db.filter(e => e.m === targetMuscle);
-        const shuffled = all.sort(() => 0.5 - Math.random());
-        const selected = shuffled.slice(0, 4); // Показываем 3-4 (Requirement 4.1)
+        // Берем уникальные последние упражнения
+        lastExercises = workouts.map(w => ({
+            id: w.id,
+            name: w.exercise,
+            weight: w.weight,
+            reps: w.reps
+        }));
 
-        const list = document.getElementById('display-list');
-        list.innerHTML = '';
-        
-        selected.forEach((ex, i) => {
-            const div = document.createElement('div');
-            div.className = `ex-item ${i === 0 ? 'active' : ''}`;
-            if(i === 0) selectedId = ex.id;
-            div.onclick = () => {
-                document.querySelectorAll('.ex-item').forEach(el => el.classList.remove('active'));
-                div.classList.add('active');
-                selectedId = ex.id;
-            };
-            div.innerHTML = `
-                <div class="ex-emoji">${ex.e}</div>
-                <div class="ex-name">${ex.n}</div>
-                <div class="ex-meta">${ex.m}</div>
-            `;
-            list.appendChild(div);
-        });
+        renderLastWorkout();
     }
 
-    async function sync() {
-        const { data: p } = await sb.rpc('get_prediction_data', { t_user_id: uid });
-        const { count: n } = await sb.from('workouts').select('*', { count: 'exact', head: true }).eq('user_id', uid);
-        document.getElementById('total-nw').innerText = (1000 + (p?.current || 0) + (n*15)).toFixed(2);
+    function renderLastWorkout() {
+        const container = document.getElementById('last-workout-container');
+        container.innerHTML = lastExercises.map(ex => `
+            <div class="ex-row">
+                <div class="ex-info"><span>💪</span> <b>${ex.name}</b></div>
+                <div class="ex-val">${ex.weight}кг × ${ex.reps}</div>
+            </div>
+        `).join('');
     }
 
-    async function save() {
-        const w = document.getElementById('w').value;
-        const r = document.getElementById('r').value;
-        if(!w || !r) return;
-        await sb.from('workouts').insert([{ user_id: uid, weight: w, reps: r, exercise: selectedId }]);
-        tg.HapticFeedback.notificationOccurred('success');
-        document.getElementById('w').value = '';
-        sync();
+    async function repeatWorkout(improve) {
+        tg.HapticFeedback.impactOccurred('medium');
+        
+        for (const ex of lastExercises) {
+            const newWeight = improve ? parseFloat(ex.weight) + 2.5 : ex.weight;
+            await sb.from('workouts').insert([{
+                user_id: uid,
+                exercise: ex.name,
+                weight: newWeight,
+                reps: ex.reps
+            }]);
+        }
+        
+        tg.showAlert(improve ? "Прогресс зафиксирован! +2.5кг к каждому весу." : "Тренировка повторена!");
+        loadLastWorkout();
     }
 
-    window.onload = () => { sync(); rotateExercises(); };
+    function openEditor() {
+        document.getElementById('main-screen').style.display = 'none';
+        document.getElementById('editor').style.display = 'block';
+        
+        const list = document.getElementById('editor-list');
+        list.innerHTML = lastExercises.map((ex, idx) => `
+            <div class="edit-item">
+                <span>${ex.name} (${ex.weight}кг)</span>
+                <button class="remove-btn" onclick="removeEx(${idx})">УДАЛИТЬ</button>
+            </div>
+        `).join('');
+    }
+
+    function removeEx(idx) {
+        lastExercises.splice(idx, 1);
+        openEditor();
+    }
+
+    function closeEditor() {
+        document.getElementById('editor').style.display = 'none';
+        document.getElementById('main-screen').style.display = 'block';
+        renderLastWorkout();
+    }
+
+    window.onload = loadLastWorkout;
 </script>
 </body>
 </html>

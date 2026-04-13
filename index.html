@@ -3,116 +3,118 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>GymProgress AI v30</title>
+    <title>GymProgress AI v31</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
-        :root { --bg: #000; --card: #111; --accent: #32d74b; --gray: #666; }
-        body { font-family: -apple-system, sans-serif; background: var(--bg); color: #fff; margin: 0; padding: 15px; }
+        :root { --bg: #000; --card: #0c0c0d; --accent: #32d74b; --gray: #444; --text-dim: #8e8e93; }
+        body { font-family: 'SF Mono', monospace; background: var(--bg); color: #fff; margin: 0; padding: 12px; overflow: hidden; }
         
-        .capital-card { background: linear-gradient(160deg, #1a1a1a 0%, #000 100%); border-radius: 30px; padding: 30px 15px; border: 1px solid #222; text-align: center; margin-bottom: 15px; position: relative; overflow: hidden; }
-        .price { font-size: 60px; font-weight: 900; letter-spacing: -3px; color: var(--accent); margin: 5px 0; }
-        .label { font-size: 10px; color: var(--gray); text-transform: uppercase; letter-spacing: 2px; }
+        /* Главный индикатор Капитала */
+        .capital-header { padding: 30px 15px; background: linear-gradient(180deg, #161618 0%, #000 100%); border-radius: 32px; border: 1px solid #1c1c1e; text-align: center; margin-bottom: 12px; }
+        .nw-title { font-size: 10px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 2px; }
+        .nw-value { font-size: 56px; font-weight: 900; letter-spacing: -2px; color: #fff; margin: 5px 0; }
+        
+        /* Визуальный юнит упражнения (Action Unit) */
+        .action-unit { background: var(--card); border-radius: 24px; padding: 20px; border: 1px solid #222; margin-bottom: 12px; display: flex; align-items: center; gap: 15px; transition: 0.3s; }
+        .unit-emoji { font-size: 32px; background: #1a1a1c; width: 60px; height: 60px; display: flex; align-items: center; justify-content: center; border-radius: 18px; border: 1px solid #333; }
+        .unit-info { flex-grow: 1; }
+        .unit-name { font-weight: 800; font-size: 18px; display: block; }
+        .unit-target { font-size: 10px; color: var(--accent); font-weight: bold; text-transform: uppercase; }
 
-        /* Визуальный блок упражнения */
-        .exercise-preview { background: #1c1c1e; border-radius: 20px; padding: 20px; margin-bottom: 15px; border: 1px solid #333; display: flex; align-items: center; gap: 20px; }
-        .ex-icon { font-size: 40px; background: rgba(50,215,75,0.1); padding: 15px; border-radius: 15px; }
-        .ex-info { text-align: left; }
-        .ex-title { font-weight: bold; font-size: 18px; display: block; }
-        .ex-muscle { font-size: 12px; color: var(--accent); text-transform: uppercase; }
+        /* Сетка ввода */
+        .input-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px; }
+        input { background: #161618; border: 1px solid #222; color: #fff; padding: 18px; border-radius: 16px; font-size: 18px; width: 100%; box-sizing: border-box; text-align: center; outline: none; }
+        input:focus { border-color: var(--accent); }
+        
+        .btn-confirm { background: var(--accent); color: #000; border: none; padding: 22px; border-radius: 20px; font-weight: 900; width: 100%; font-size: 18px; text-transform: uppercase; letter-spacing: 1px; cursor: pointer; }
 
-        .chart-box { height: 140px; margin: 15px 0; position: relative; }
-        .blur-overlay { position: absolute; right: 0; top: 0; width: 50%; height: 100%; background: linear-gradient(90deg, transparent, #000 90%); backdrop-filter: blur(8px); display: flex; align-items: center; justify-content: center; color: var(--accent); font-size: 11px; font-weight: bold; text-align: center; }
-
-        .trade-panel { background: var(--card); padding: 20px; border-radius: 28px; border: 1px solid #222; }
-        select, input { background: #1c1c1e; border: 1px solid #333; color: #fff; padding: 16px; border-radius: 14px; width: 100%; box-sizing: border-box; margin-bottom: 10px; font-size: 16px; outline: none; }
-        .btn-action { background: var(--accent); color: #000; border: none; padding: 20px; border-radius: 18px; font-weight: 900; width: 100%; font-size: 17px; text-transform: uppercase; cursor: pointer; }
+        /* Мини-график прогноза */
+        .forecast-box { height: 100px; margin-top: 10px; position: relative; }
+        .lock-text { position: absolute; inset: 0; background: rgba(0,0,0,0.7); backdrop-filter: blur(4px); display: flex; align-items: center; justify-content: center; font-size: 10px; color: var(--accent); font-weight: bold; border-radius: 15px; }
     </style>
 </head>
 <body>
 
-<div class="capital-card">
-    <span class="label">Body Net Worth</span>
-    <div class="price" id="nw">1000.00</div>
-    <div class="chart-box">
-        <canvas id="chart"></canvas>
-        <div class="blur-overlay" id="lock">FUTURE LOCKED<br>Нужно 3 записи</div>
+<div class="capital-header">
+    <span class="nw-title">Body Net Worth</span>
+    <div class="nw-value" id="val-nw">1000.00</div>
+    <div id="prediction-info" style="font-size: 11px; color: var(--accent);">TARGET: +2.5kg NEXT SESSION</div>
+</div>
+
+<div class="action-unit" id="active-unit">
+    <div class="unit-emoji" id="u-emoji">💪</div>
+    <div class="unit-info">
+        <span class="unit-target" id="u-muscle">ГРУДЬ</span>
+        <span class="unit-name" id="u-name">Жим штанги</span>
     </div>
 </div>
 
-<div class="exercise-preview" id="preview-box">
-    <div class="ex-icon" id="ex-emoji">🏋️‍♂️</div>
-    <div class="ex-info">
-        <span class="ex-title" id="ex-display-name">Жим штанги</span>
-        <span class="ex-muscle" id="ex-display-muscle">Целевая группа: ГРУДЬ</span>
-    </div>
+<select id="ex-select" onchange="updateUnit()" style="background: #161618; color: #fff; border: 1px solid #222; padding: 15px; border-radius: 15px; width: 100%; margin-bottom: 12px; font-size: 14px;">
+    <option value="bench" data-m="ГРУДЬ" data-e="💪" data-n="Жим штанги">Жим штанги (Chest)</option>
+    <option value="squat" data-m="НОГИ" data-e="🦵" data-n="Приседания">Приседания (Legs)</option>
+    <option value="pullups" data-m="СПИНА" data-e="🦇" data-n="Подтягивания">Подтягивания (Back)</option>
+    <option value="ohp" data-m="ПЛЕЧИ" data-e="🛡️" data-n="Жим армейский">Жим плечи (Shoulders)</option>
+</select>
+
+<div class="input-grid">
+    <input type="number" id="in-w" placeholder="ВЕС">
+    <input type="number" id="in-r" placeholder="РЕПС">
 </div>
 
-<div class="trade-panel">
-    <select id="exercise" onchange="updatePreview()">
-        <option value="bench" data-emoji="💪" data-name="Жим штанги" data-muscle="ГРУДЬ">Жим штанги (Грудь)</option>
-        <option value="squat" data-emoji="🦵" data-name="Приседания" data-muscle="НОГИ">Приседания (Ноги)</option>
-        <option value="deadlift" data-emoji="🧱" data-name="Становая тяга" data-muscle="СПИНА">Становая тяга (Спина)</option>
-        <option value="pullups" data-emoji="🦇" data-name="Подтягивания" data-muscle="ВЕРХ СПИНЫ">Подтягивания (Спина)</option>
-        <option value="biceps" data-emoji="🚀" data-name="Бицепс" data-muscle="РУКИ">Бицепс (Руки)</option>
-    </select>
-    <div style="display:flex; gap:10px;">
-        <input type="number" id="weight" placeholder="Вес">
-        <input type="number" id="reps" placeholder="Повторы">
-    </div>
-    <button class="btn-action" onclick="makeTrade()">Зафиксировать прибыль</button>
+<button class="btn-confirm" onclick="execute()">CONFIRM ACTION</button>
+
+<div class="forecast-box">
+    <canvas id="fChart"></canvas>
+    <div class="lock-text" id="lock-msg">FORECAST LOCKED: NEED 3 SESSIONS</div>
 </div>
 
 <script>
     const tg = window.Telegram.WebApp;
     const sb = supabase.createClient('https://zgsvtvbwgbxyztyxynez.supabase.co', 'sb_publishable_HPZQa10In3R3s6siI4ttAQ_QpWWZmgS');
     const uid = String(tg.initDataUnsafe?.user?.id || "796100711");
-    let myChart;
+    let chart;
 
-    function updatePreview() {
-        const sel = document.getElementById('exercise');
-        const opt = sel.options[sel.selectedIndex];
-        document.getElementById('ex-emoji').innerText = opt.dataset.emoji;
-        document.getElementById('ex-display-name').innerText = opt.dataset.name;
-        document.getElementById('ex-display-muscle').innerText = "Целевая группа: " + opt.dataset.muscle;
+    function updateUnit() {
+        const s = document.getElementById('ex-select');
+        const o = s.options[s.selectedIndex];
+        document.getElementById('u-emoji').innerText = o.dataset.e;
+        document.getElementById('u-name').innerText = o.dataset.n;
+        document.getElementById('u-muscle').innerText = o.dataset.m;
     }
 
     async function sync() {
         const { data: p } = await sb.rpc('get_prediction_data', { t_user_id: uid });
         const { count: n } = await sb.from('workouts').select('*', { count: 'exact', head: true }).eq('user_id', uid);
         const cur = p?.current || 0;
-        document.getElementById('nw').innerText = (1000 + cur + (n*15)).toFixed(2);
-        if (n >= 3) document.getElementById('lock').style.display = 'none';
-        draw(cur);
+        document.getElementById('val-nw').innerText = (1000 + cur + (n*15)).toFixed(2);
+        if (n >= 3) document.getElementById('lock-msg').style.display = 'none';
+        render(cur);
     }
 
-    async function makeTrade() {
-        const w = document.getElementById('weight').value;
-        const r = document.getElementById('reps').value;
+    async function execute() {
+        const w = document.getElementById('in-w').value;
+        const r = document.getElementById('in-r').value;
         if(!w || !r) return;
-        await sb.from('workouts').insert([{
-            user_id: uid, weight: parseFloat(w), reps: parseInt(r), exercise: document.getElementById('exercise').value
-        }]);
+        await sb.from('workouts').insert([{ user_id: uid, weight: w, reps: r, exercise: document.getElementById('ex-select').value }]);
         tg.HapticFeedback.notificationOccurred('success');
-        document.getElementById('weight').value = '';
+        document.getElementById('in-w').value = '';
         sync();
     }
 
-    function draw(v) {
-        const ctx = document.getElementById('chart').getContext('2d');
-        if(myChart) myChart.destroy();
-        myChart = new Chart(ctx, {
+    function render(v) {
+        const ctx = document.getElementById('fChart').getContext('2d');
+        if(chart) chart.destroy();
+        chart = new Chart(ctx, {
             type: 'line',
-            data: {
-                labels: ['Сейчас', '30д', '60д'],
-                datasets: [{ data: [v, v+10, v+20], borderColor: '#32d74b', tension: 0.4, fill: true, backgroundColor: 'rgba(50,215,75,0.05)', pointRadius: 0 }]
-            },
-            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { display: false }, x: { display: false } } }
+            data: { labels: ['Now', '30d', '60d'], datasets: [{ data: [v, v+10, v+20], borderColor: '#32d74b', tension: 0.4, fill: true, backgroundColor: 'rgba(50,215,75,0.05)', pointRadius: 0 }] },
+            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { display: false }, y: { display: false } } }
         });
     }
 
-    window.onload = () => { sync(); updatePreview(); };
+    tg.expand();
+    window.onload = () => { sync(); updateUnit(); };
 </script>
 </body>
 </html>

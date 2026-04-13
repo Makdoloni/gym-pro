@@ -3,145 +3,192 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>GymProgress AI v33</title>
+    <title>GymProgress AI v34</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         :root { --bg: #000; --card: #0c0c0d; --accent: #32d74b; --dim: #8e8e93; --danger: #ff3b30; }
-        body { font-family: 'SF Mono', monospace; background: var(--bg); color: #fff; margin: 0; padding: 12px; }
+        body { font-family: -apple-system, sans-serif; background: var(--bg); color: #fff; margin: 0; padding: 12px; line-height: 1.4; }
         
-        .header { padding: 20px 10px; text-align: center; border-bottom: 1px solid #222; margin-bottom: 15px; }
-        .label { font-size: 10px; color: var(--dim); text-transform: uppercase; letter-spacing: 2px; }
+        .header { padding: 20px 0; text-align: center; }
+        .label { font-size: 10px; color: var(--dim); text-transform: uppercase; letter-spacing: 2px; display: block; margin-bottom: 8px; }
         
-        /* Экран последней тренировки */
-        .last-workout-card { background: var(--card); border-radius: 24px; padding: 20px; border: 1px solid #222; margin-bottom: 15px; }
+        /* Карточки */
+        .card { background: var(--card); border-radius: 24px; padding: 20px; border: 1px solid #1c1c1e; margin-bottom: 15px; }
         .ex-row { display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px solid #1a1a1a; }
         .ex-row:last-child { border: none; }
-        .ex-info { display: flex; align-items: center; gap: 10px; }
-        .ex-val { font-weight: bold; color: var(--accent); }
-
-        /* Кнопки действий */
-        .btn-group { display: grid; grid-template-columns: 1fr; gap: 10px; }
-        .btn-main { background: var(--accent); color: #000; border: none; padding: 20px; border-radius: 18px; font-weight: 900; font-size: 16px; cursor: pointer; text-transform: uppercase; }
-        .btn-sec { background: #1a1a1c; color: #fff; border: 1px solid #333; padding: 15px; border-radius: 18px; font-size: 14px; cursor: pointer; }
         
-        /* Модалка редактирования */
-        #editor { display: none; position: fixed; inset: 0; background: #000; padding: 20px; z-index: 100; }
-        .edit-item { background: #111; padding: 15px; border-radius: 15px; margin-bottom: 10px; display: flex; justify-content: space-between; }
-        .remove-btn { color: var(--danger); font-size: 12px; font-weight: bold; border: none; background: none; }
+        /* Кнопки */
+        .btn { border: none; border-radius: 18px; font-weight: 800; font-size: 15px; cursor: pointer; transition: 0.2s; width: 100%; margin-bottom: 10px; display: block; text-align: center; text-decoration: none; padding: 18px 0; }
+        .btn-main { background: var(--accent); color: #000; text-transform: uppercase; }
+        .btn-sec { background: #1a1a1c; color: #fff; border: 1px solid #333; }
+        .btn-add { background: #1a1a1c; color: var(--accent); border: 1px dashed var(--accent); font-size: 13px; }
+        .btn-danger { color: var(--danger); font-size: 11px; background: none; width: auto; padding: 5px; margin: 0; }
+
+        /* Экраны */
+        .screen { display: none; }
+        .screen.active { display: block; }
+
+        /* Список выбора */
+        .catalog-item { padding: 15px; background: #111; border-radius: 14px; margin-bottom: 8px; display: flex; align-items: center; gap: 12px; border: 1px solid #222; }
     </style>
 </head>
 <body>
 
-<div id="main-screen">
+<div id="screen-main" class="screen">
     <div class="header">
-        <span class="label">Твоя ценность растет</span>
-        <div style="font-size: 32px; font-weight: 900;" id="user-nw">1000.00</div>
+        <span class="label">Текущий план</span>
+        <div style="font-size: 28px; font-weight: 900;" id="status-title">Загрузка...</div>
     </div>
 
-    <div class="label" style="margin-bottom: 10px; display: block;">Последняя тренировка</div>
-    <div class="last-workout-card" id="last-workout-container">
-        <div style="color: var(--dim); text-align: center; padding: 20px;">Загрузка истории...</div>
+    <div class="card" id="workout-container">
+        </div>
+
+    <div id="main-actions">
+        <button class="btn btn-main" onclick="saveWorkout(true)">🚀 ПРИМЕНИТЬ ПРОГРЕСС (+2.5кг)</button>
+        <button class="btn btn-sec" onclick="saveWorkout(false)">🔁 ПОВТОРИТЬ КАК БЫЛО</button>
+        <button class="btn btn-add" onclick="openCatalog()">+ ДОБАВИТЬ УПРАЖНЕНИЕ</button>
     </div>
 
-    <div class="btn-group">
-        <button class="btn-main" onclick="repeatWorkout(true)">🚀 ПРИМЕНИТЬ ПРОГРЕСС (+2.5кг)</button>
-        <button class="btn-sec" onclick="repeatWorkout(false)">🔁 ПОВТОРИТЬ КАК БЫЛО</button>
-        <button class="btn-sec" onclick="openEditor()">⚙️ ИЗМЕНИТЬ СОСТАВ</button>
+    <div id="empty-actions" style="display:none;">
+        <div style="text-align:center; color:var(--dim); margin-bottom:20px;">У вас еще нет истории тренировок</div>
+        <button class="btn btn-main" onclick="openCatalog()">СОЗДАТЬ ПЕРВУЮ ТРЕНИРОВКУ</button>
     </div>
 </div>
 
-<div id="editor">
+<div id="screen-catalog" class="screen">
     <div class="header">
-        <span class="label">Редактор тренировки</span>
+        <span class="label">Выберите упражнение</span>
     </div>
-    <div id="editor-list"></div>
-    <button class="btn-sec" onclick="closeEditor()" style="width: 100%; margin-top: 20px;">ВЕРНУТЬСЯ</button>
+    <div id="catalog-list"></div>
+    <button class="btn btn-sec" onclick="closeCatalog()">НАЗАД К ПЛАНУ</button>
 </div>
 
 <script>
     const tg = window.Telegram.WebApp;
     const sb = supabase.createClient('https://zgsvtvbwgbxyztyxynez.supabase.co', 'sb_publishable_HPZQa10In3R3s6siI4ttAQ_QpWWZmgS');
     const uid = String(tg.initDataUnsafe?.user?.id || "796100711");
-    
-    let lastExercises = [];
 
-    async function loadLastWorkout() {
-        // 6.1 Получаем последнюю сессию
-        const { data: workouts } = await sb.from('workouts')
+    // 3.1 Встроенный источник упражнений (MVP Source)
+    const exerciseSource = [
+        { id: 'bench', n: 'Жим штанги', m: 'Грудь', e: '💪' },
+        { id: 'db_press', n: 'Жим гантелей', m: 'Грудь', e: '🏋️' },
+        { id: 'squat', n: 'Приседания', m: 'Ноги', e: '🦵' },
+        { id: 'leg_press', n: 'Жим ногами', m: 'Ноги', e: '🚜' },
+        { id: 'deadlift', n: 'Становая тяга', m: 'Спина', e: '🧱' },
+        { id: 'pullups', n: 'Подтягивания', m: 'Спина', e: '🦇' },
+        { id: 'ohp', n: 'Жим стоя', m: 'Плечи', e: '🛡️' },
+        { id: 'biceps', n: 'Подъем на бицепс', m: 'Руки', e: '🚀' }
+    ];
+
+    let currentWorkout = [];
+
+    async function init() {
+        const { data: lastLogs } = await sb.from('workouts')
             .select('*')
             .eq('user_id', uid)
             .order('created_at', { ascending: false })
-            .limit(5);
+            .limit(10);
 
-        if (!workouts || workouts.length === 0) {
-            document.getElementById('last-workout-container').innerHTML = "Пока нет тренировок. Начни первую!";
+        if (!lastLogs || lastLogs.length === 0) {
+            showEmptyState();
+        } else {
+            // Берем последние уникальные упражнения (ядро системы)
+            const seen = new Set();
+            currentWorkout = lastLogs.filter(item => {
+                if (seen.has(item.exercise)) return false;
+                seen.add(item.exercise);
+                return true;
+            }).map(item => ({
+                name: item.exercise,
+                weight: item.weight,
+                reps: item.reps,
+                emoji: '💪'
+            }));
+            showMainState();
+        }
+    }
+
+    function showEmptyState() {
+        document.getElementById('screen-main').classList.add('active');
+        document.getElementById('status-title').innerText = "Новый старт";
+        document.getElementById('main-actions').style.display = 'none';
+        document.getElementById('empty-actions').style.display = 'block';
+        document.getElementById('workout-container').innerHTML = "<div style='text-align:center;color:#444'>План пуст</div>";
+    }
+
+    function showMainState() {
+        document.getElementById('screen-main').classList.add('active');
+        document.getElementById('status-title').innerText = "Твой План";
+        document.getElementById('main-actions').style.display = 'block';
+        document.getElementById('empty-actions').style.display = 'none';
+        renderWorkout();
+    }
+
+    function renderWorkout() {
+        const container = document.getElementById('workout-container');
+        if (currentWorkout.length === 0) {
+            container.innerHTML = "<div style='text-align:center;color:#444'>Добавьте упражнения</div>";
             return;
         }
-
-        // Берем уникальные последние упражнения
-        lastExercises = workouts.map(w => ({
-            id: w.id,
-            name: w.exercise,
-            weight: w.weight,
-            reps: w.reps
-        }));
-
-        renderLastWorkout();
-    }
-
-    function renderLastWorkout() {
-        const container = document.getElementById('last-workout-container');
-        container.innerHTML = lastExercises.map(ex => `
+        container.innerHTML = currentWorkout.map((ex, idx) => `
             <div class="ex-row">
-                <div class="ex-info"><span>💪</span> <b>${ex.name}</b></div>
-                <div class="ex-val">${ex.weight}кг × ${ex.reps}</div>
+                <div>${ex.emoji} <b>${ex.name}</b></div>
+                <div style="display:flex; align-items:center; gap:10px;">
+                    <span style="color:var(--accent)">${ex.weight}кг</span>
+                    <button class="btn-danger" onclick="removeEx(${idx})">✕</button>
+                </div>
             </div>
         `).join('');
     }
 
-    async function repeatWorkout(improve) {
-        tg.HapticFeedback.impactOccurred('medium');
-        
-        for (const ex of lastExercises) {
-            const newWeight = improve ? parseFloat(ex.weight) + 2.5 : ex.weight;
-            await sb.from('workouts').insert([{
-                user_id: uid,
-                exercise: ex.name,
-                weight: newWeight,
-                reps: ex.reps
-            }]);
-        }
-        
-        tg.showAlert(improve ? "Прогресс зафиксирован! +2.5кг к каждому весу." : "Тренировка повторена!");
-        loadLastWorkout();
-    }
-
-    function openEditor() {
-        document.getElementById('main-screen').style.display = 'none';
-        document.getElementById('editor').style.display = 'block';
-        
-        const list = document.getElementById('editor-list');
-        list.innerHTML = lastExercises.map((ex, idx) => `
-            <div class="edit-item">
-                <span>${ex.name} (${ex.weight}кг)</span>
-                <button class="remove-btn" onclick="removeEx(${idx})">УДАЛИТЬ</button>
+    function openCatalog() {
+        document.getElementById('screen-main').classList.remove('active');
+        document.getElementById('screen-catalog').classList.add('active');
+        const list = document.getElementById('catalog-list');
+        list.innerHTML = exerciseSource.map(ex => `
+            <div class="catalog-item" onclick="addFromCatalog('${ex.n}', '${ex.e}')">
+                <span style="font-size:24px">${ex.e}</span>
+                <div style="flex-grow:1">
+                    <div style="font-weight:bold">${ex.n}</div>
+                    <div style="font-size:10px; color:var(--dim)">${ex.m}</div>
+                </div>
+                <div style="color:var(--accent); font-size:20px">+</div>
             </div>
         `).join('');
+    }
+
+    function addFromCatalog(name, emoji) {
+        // 6. Логика добавления с дефолтными значениями
+        currentWorkout.push({ name, weight: 40, reps: 8, emoji });
+        tg.HapticFeedback.impactOccurred('light');
+        closeCatalog();
     }
 
     function removeEx(idx) {
-        lastExercises.splice(idx, 1);
-        openEditor();
+        currentWorkout.splice(idx, 1);
+        renderWorkout();
     }
 
-    function closeEditor() {
-        document.getElementById('editor').style.display = 'none';
-        document.getElementById('main-screen').style.display = 'block';
-        renderLastWorkout();
+    function closeCatalog() {
+        document.getElementById('screen-catalog').classList.remove('active');
+        showMainState();
+        renderWorkout();
     }
 
-    window.onload = loadLastWorkout;
+    async function saveWorkout(improve) {
+        tg.HapticFeedback.notificationOccurred('success');
+        for (const ex of currentWorkout) {
+            const finalWeight = improve ? parseFloat(ex.weight) + 2.5 : ex.weight;
+            await sb.from('workouts').insert([{
+                user_id: uid, exercise: ex.name, weight: finalWeight, reps: ex.reps
+            }]);
+        }
+        tg.showAlert("Тренировка сохранена!");
+        init();
+    }
+
+    window.onload = init;
 </script>
 </body>
 </html>

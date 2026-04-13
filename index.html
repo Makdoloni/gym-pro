@@ -3,90 +3,63 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>GymProgress AI v5</title>
+    <title>Твой Капитал Тела</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
-        :root { --bg: #000; --card: #0a0a0b; --accent: #32d74b; --warning: #ff3b30; --gray: #8e8e93; --gold: #ffd700; }
-        body { font-family: 'SF Mono', 'Fira Code', monospace; background: var(--bg); color: #fff; margin: 0; padding: 12px; overflow-x: hidden; }
+        :root { --bg: #000; --accent: #32d74b; --card: #111; }
+        body { font-family: -apple-system, sans-serif; background: var(--bg); color: #fff; margin: 0; padding: 15px; }
         
-        /* HEADER - CAPITAL VIEW */
-        .header { padding: 35px 15px; background: linear-gradient(180deg, #111 0%, #000 100%); border-radius: 30px; border: 1px solid #222; text-align: center; margin-bottom: 15px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
-        .net-worth { font-size: 58px; font-weight: 900; letter-spacing: -3px; color: #fff; margin: 10px 0; font-variant-numeric: tabular-nums; }
-        .streak-badge { position: absolute; top: 15px; right: 20px; background: rgba(50,215,75,0.1); color: var(--accent); padding: 5px 12px; border-radius: 20px; font-size: 11px; font-weight: bold; border: 1px solid var(--accent); }
+        .main-card { background: linear-gradient(145deg, #1a1a1a, #000); border-radius: 25px; padding: 25px; border: 1px solid #333; text-align: center; margin-bottom: 20px; }
+        .price { font-size: 50px; font-weight: 900; color: var(--accent); margin: 10px 0; }
+        .label { font-size: 12px; color: #888; text-transform: uppercase; }
         
-        /* ASSET CARDS */
-        .asset-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 15px; }
-        .asset-box { background: var(--card); padding: 18px; border-radius: 22px; border: 1px solid #1c1c1e; position: relative; overflow: hidden; }
-        .asset-box::after { content: ''; position: absolute; top: 0; left: 0; width: 100%; height: 2px; background: var(--accent); opacity: 0.3; }
-        .label { font-size: 10px; color: var(--gray); text-transform: uppercase; letter-spacing: 1.5px; display: block; margin-bottom: 6px; }
-        .val { font-size: 24px; font-weight: 800; }
-        .delta { font-size: 11px; color: var(--accent); font-weight: bold; }
+        .stats { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 20px; }
+        .stat-box { background: var(--card); padding: 15px; border-radius: 20px; border: 1px solid #222; }
+        .stat-val { font-size: 20px; font-weight: bold; }
 
-        /* INPUTS & CONTROLS */
-        .trade-panel { background: var(--card); padding: 20px; border-radius: 25px; border: 1px solid #222; margin-top: 10px; }
-        select, input { background: #161618; border: 1px solid #2c2c2e; color: #fff; padding: 18px; border-radius: 16px; font-size: 16px; width: 100%; box-sizing: border-box; outline: none; margin-bottom: 12px; transition: 0.3s; }
-        select:focus, input:focus { border-color: var(--accent); }
-        .btn-trade { background: var(--accent); color: #000; border: none; padding: 22px; border-radius: 20px; font-weight: 900; width: 100%; font-size: 18px; text-transform: uppercase; cursor: pointer; box-shadow: 0 4px 15px rgba(50,215,75,0.3); }
+        .input-group { background: var(--card); padding: 20px; border-radius: 25px; border: 1px solid #222; }
+        select, input { background: #222; border: 1px solid #444; color: #fff; padding: 15px; border-radius: 12px; width: 100%; box-sizing: border-box; margin-bottom: 10px; font-size: 16px; }
+        .btn { background: var(--accent); color: #000; border: none; padding: 18px; border-radius: 15px; font-weight: 900; width: 100%; font-size: 18px; cursor: pointer; }
 
-        /* CHARTS */
-        .chart-container { height: 180px; margin: 20px 0; position: relative; }
-        .blur-lock { position: absolute; right: 0; top: 0; width: 50%; height: 100%; background: linear-gradient(90deg, transparent, rgba(0,0,0,0.98) 90%); backdrop-filter: blur(8px); display: flex; align-items: center; justify-content: center; color: var(--accent); font-size: 12px; font-weight: bold; text-align: center; border-radius: 0 22px 22px 0; z-index: 10; border-left: 1px solid rgba(50,215,75,0.2); }
+        .chart-box { height: 150px; margin: 20px 0; position: relative; }
+        .lock-overlay { position: absolute; right: 0; top: 0; width: 50%; height: 100%; background: rgba(0,0,0,0.8); backdrop-filter: blur(8px); display: flex; align-items: center; justify-content: center; border-radius: 0 20px 20px 0; color: var(--accent); font-size: 10px; font-weight: bold; text-align: center; }
     </style>
 </head>
 <body>
 
-<div class="header">
-    <div class="streak-badge" id="streak-val">STREAK: 0</div>
-    <span class="label">Body Capital (NW)</span>
-    <div class="net-worth" id="total-nw">1000.00</div>
-    <div style="color: var(--accent); font-size: 13px; letter-spacing: 1px;" id="prediction-msg">PROJECTION: LOADING...</div>
+<div class="main-card">
+    <span class="label">Твоя ценность (в баллах)</span>
+    <div class="price" id="total-val">1000.00</div>
+    <div id="status-text" style="font-size: 12px; opacity: 0.7;">Рынок активен</div>
     
-    <div class="chart-container">
-        <canvas id="predictionChart"></canvas>
-        <div class="blur-lock" id="future-lock">60D FORECAST<br>LOCKED</div>
+    <div class="chart-box">
+        <canvas id="myChart"></canvas>
+        <div class="lock-overlay" id="lock">БУДУЩЕЕ ЗАБЛОКИРОВАНО<br>Нужно 3 тренировки</div>
     </div>
 </div>
 
-<div class="asset-row">
-    <div class="asset-box">
-        <span class="label">Strength Index</span>
-        <div class="val" id="str-idx">0.0</div>
-        <div class="delta" id="str-delta">+0.0%</div>
-    </div>
-    <div class="asset-box">
-        <span class="label">Discipline</span>
-        <div class="val" id="dis-idx">0.0</div>
-        <div class="delta" id="dis-delta">STABLE</div>
-    </div>
+<div class="stats">
+    <div class="stat-box"><span class="label">Сила</span><div class="stat-val" id="power">0.0</div></div>
+    <div class="stat-box"><span class="label">Дисциплина</span><div class="stat-val" id="streak">0.0</div></div>
 </div>
 
-<div class="trade-panel">
-    <span class="label" style="margin-bottom: 15px;">New Market Order</span>
-    <select id="ex-select">
-        <optgroup label="ГРУДЬ / ПЛЕЧИ">
-            <option value="bench_press">Жим штанги (Грудь)</option>
-            <option value="incline_press">Жим в наклоне</option>
-            <option value="ohp">Жим стоя (Армейский)</option>
-        </optgroup>
-        <optgroup label="СПИНА / НОГИ">
-            <option value="deadlift">Становая тяга</option>
-            <option value="squat">Приседания</option>
-            <option value="pullups">Подтягивания (Вес)</option>
-            <option value="rows">Тяга штанги</option>
-        </optgroup>
-        <optgroup label="РУКИ">
-            <option value="biceps">Бицепс штанга</option>
-            <option value="dips">Брусья (Вес)</option>
-        </optgroup>
+<div class="input-group">
+    <span class="label">Записать тренировку</span>
+    <select id="exercise">
+        <option value="bench">Жим лежа (Грудь)</option>
+        <option value="squat">Приседания (Ноги)</option>
+        <option value="pullups">Подтягивания (Спина)</option>
+        <option value="press">Жим гантелей (Плечи)</option>
+        <option value="deadlift">Становая тяга (Всё тело)</option>
+        <option value="biceps">Бицепс (Руки)</option>
     </select>
-    
-    <div style="display:flex; gap:12px;">
-        <input type="number" id="weight-input" placeholder="Weight (kg)" step="0.5">
-        <input type="number" id="reps-input" placeholder="Reps">
+    <div style="display:flex; gap:10px;">
+        <input type="number" id="weight" placeholder="Вес (кг)">
+        <input type="number" id="reps" placeholder="Повторы">
     </div>
-    <button class="btn-trade" onclick="executeTrade()">Confirm Investment</button>
+    <button class="btn" onclick="saveData()">ЗАФИКСИРОВАТЬ ПРИБЫЛЬ</button>
 </div>
 
 <script>
@@ -95,86 +68,65 @@
     const uid = String(tg.initDataUnsafe?.user?.id || "796100711");
     let chart;
 
-    async function sync() {
-        // 1. Получаем данные через RPC (прогноз)
+    async function loadData() {
         const { data: p } = await sb.rpc('get_prediction_data', { t_user_id: uid });
-        // 2. Считаем количество сделок (тренировок)
         const { count: n } = await sb.from('workouts').select('*', { count: 'exact', head: true }).eq('user_id', uid);
         
-        const cur = p?.current || 0;
-        const f30 = cur + 10; // Simple Engine 4.3
-        const f60 = cur + 20;
-        const discipline = (n || 0) * 15.5;
-
-        // UI Update
-        document.getElementById('total-nw').innerText = (1000 + cur + discipline).toFixed(2);
-        document.getElementById('str-idx').innerText = cur.toFixed(1);
-        document.getElementById('dis-idx').innerText = discipline.toFixed(1);
-        document.getElementById('streak-val').innerText = `STREAK: ${n}`;
+        const currentPower = p?.current || 0;
+        const discipline = (n || 0) * 15;
         
-        // CEO Logic: Unlock future
-        if (n >= 3) {
-            document.getElementById('future-lock').style.display = 'none';
-            document.getElementById('prediction-msg').innerText = `60D TARGET: ${(cur+20).toFixed(1)} KG`;
-        } else {
-            document.getElementById('prediction-msg').innerText = `UNLOCK FUTURE IN ${3-n} WORKOUTS`;
-        }
-
-        updateChart(cur, f30, f60);
+        document.getElementById('total-val').innerText = (1000 + currentPower + discipline).toFixed(2);
+        document.getElementById('power').innerText = currentPower.toFixed(1);
+        document.getElementById('streak').innerText = discipline.toFixed(0);
+        
+        if (n >= 3) document.getElementById('lock').style.display = 'none';
+        
+        drawChart(currentPower);
     }
 
-    async function executeTrade() {
-        const w = parseFloat(document.getElementById('weight-input').value);
-        const r = parseInt(document.getElementById('reps-input').value);
+    async function saveData() {
+        const w = document.getElementById('weight').value;
+        const r = document.getElementById('reps').value;
         if(!w || !r) return;
 
-        const { error } = await sb.from('workouts').insert([{
+        await sb.from('workouts').insert([{
             user_id: uid,
-            exercise: document.getElementById('ex-select').value,
-            weight: w,
-            reps: r
+            weight: parseFloat(w),
+            reps: parseInt(r),
+            exercise: document.getElementById('exercise').value
         }]);
 
-        if(!error) {
-            tg.HapticFeedback.notificationOccurred('success');
-            // Эффект CEO: Очистка полей после сделки
-            document.getElementById('weight-input').value = '';
-            document.getElementById('reps-input').value = '';
-            sync();
-        }
+        tg.HapticFeedback.notificationOccurred('success');
+        document.getElementById('weight').value = '';
+        document.getElementById('reps').value = '';
+        loadData();
     }
 
-    function updateChart(c, f1, f2) {
-        const ctx = document.getElementById('predictionChart').getContext('2d');
+    function drawChart(v) {
+        const ctx = document.getElementById('myChart').getContext('2d');
         if(chart) chart.destroy();
         chart = new Chart(ctx, {
             type: 'line',
             data: {
-                labels: ['NOW', '30D', '60D'],
+                labels: ['Сегодня', '30 дней', '60 дней'],
                 datasets: [{
-                    data: [c, f1, f2],
+                    data: [v, v+10, v+20],
                     borderColor: '#32d74b',
-                    borderWidth: 4,
-                    pointBackgroundColor: '#32d74b',
-                    pointRadius: 6,
                     tension: 0.4,
                     fill: true,
-                    backgroundColor: 'rgba(50, 215, 75, 0.05)'
+                    backgroundColor: 'rgba(50,215,75,0.1)'
                 }]
             },
             options: {
                 responsive: true, maintainAspectRatio: false,
-                scales: { 
-                    y: { display: false }, 
-                    x: { grid: { color: '#1c1c1e' }, ticks: { color: '#8e8e93', font: { weight: 'bold' } } } 
-                },
-                plugins: { legend: { display: false } }
+                plugins: { legend: { display: false } },
+                scales: { y: { display: false }, x: { ticks: { color: '#666' } } }
             }
         });
     }
 
     tg.expand();
-    window.onload = sync;
+    window.onload = loadData;
 </script>
 </body>
 </html>
